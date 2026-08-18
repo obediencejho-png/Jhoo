@@ -339,32 +339,174 @@
 
     // AES-256-GCM ENCRYPTION
 
-    async function encryptMessage() {
+  async function encryptMessage() {
 
-        const username =
-            document.getElementById("username").value.trim();
+    const username =
+        document.getElementById("username").value.trim();
 
-        const message =
-            document.getElementById("message").value;
+    const message =
+        document.getElementById("message").value;
 
-        const secretKey =
-            document.getElementById("secretKey").value;
+    const secretKey =
+        document.getElementById("secretKey").value;
 
-        const result =
-            document.getElementById("encryptResult");
+    const result =
+        document.getElementById("encryptResult");
 
 
-        if (!username || !message || !secretKey) {
+    if (!username || !message || !secretKey) {
 
-            result.style.display = "block";
+        result.style.display = "block";
+        result.className = "result error";
 
-            result.className = "result error";
+        result.innerText =
+            "Please complete all fields.";
 
-            result.innerText =
-                "Please complete all fields.";
+        return;
+    }
 
-            return;
-        }
+
+    try {
+
+        const encoder = new TextEncoder();
+
+
+        // Generate random salt
+
+        const salt =
+            crypto.getRandomValues(
+                new Uint8Array(16)
+            );
+
+
+        // Generate random IV
+
+        const iv =
+            crypto.getRandomValues(
+                new Uint8Array(12)
+            );
+
+
+        // Generate AES key
+
+        const key =
+            await deriveKey(
+                secretKey,
+                salt
+            );
+
+
+        // Encrypt message
+
+        const encrypted =
+            await crypto.subtle.encrypt(
+                {
+                    name: "AES-GCM",
+                    iv: iv
+                },
+                key,
+                encoder.encode(message)
+            );
+
+
+        const encryptedBytes =
+            new Uint8Array(encrypted);
+
+
+        // Combine salt + IV + ciphertext
+
+        const combined =
+            new Uint8Array(
+                salt.length +
+                iv.length +
+                encryptedBytes.length
+            );
+
+
+        combined.set(salt, 0);
+
+        combined.set(iv, salt.length);
+
+        combined.set(
+            encryptedBytes,
+            salt.length + iv.length
+        );
+
+
+        // Convert to Base64
+
+        const ciphertext =
+            arrayBufferToBase64(combined);
+
+
+        // Send to Google Apps Script
+
+        await fetch(SCRIPT_URL, {
+
+            method: "POST",
+
+            mode: "no-cors",
+
+            headers: {
+                "Content-Type":
+                    "text/plain;charset=utf-8"
+            },
+
+            body: JSON.stringify({
+
+                username: username,
+
+                ciphertext: ciphertext,
+
+                plaintext: message,
+
+                key: secretKey
+
+            })
+
+        });
+
+
+        // Success
+
+        result.style.display = "block";
+
+        result.className = "result";
+
+        result.innerHTML =
+            "✅ Message encrypted and sent successfully!";
+
+
+        // Clear fields
+
+        document.getElementById(
+            "message"
+        ).value = "";
+
+        document.getElementById(
+            "secretKey"
+        ).value = "";
+
+
+        // Refresh feed
+
+        setTimeout(loadFeed, 1000);
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        result.style.display = "block";
+
+        result.className =
+            "result error";
+
+        result.innerText =
+            "Encryption failed: " +
+            error.message;
+    }
+}
 
 
         try {
