@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AES Encryption Public Feed</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            color: #222;
+            padding: 30px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            color: #4b0082;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #666;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            color: #4b0082;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+            font-size: 15px;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        button {
+            margin-top: 18px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .encrypt-btn {
+            background: #4b0082;
+            color: white;
+        }
+
+        .decrypt-btn {
+            background: #008000;
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        .post {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .username {
+            font-weight: bold;
+            color: #4b0082;
+        }
+
+        .date {
+            font-size: 12px;
+            color: #777;
+        }
+
+        .ciphertext {
+            background: #eee;
+            padding: 12px;
+            border-radius: 6px;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 7px;
+            background: #e8f5e9;
+            display: none;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #b71c1c;
+        }
+
+        .loading {
+            text-align: center;
+            color: #777;
+        }
+
+        .info {
+            background: #fff8e1;
+            border-left: 5px solid #ffb300;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <header>
+        <h1>🔐 AES-256-GCM Encryption</h1>
+        <p>Encrypt messages and challenge other users to decrypt them.</p>
+    </header>
+
+    <div class="info">
+        <strong>How it works:</strong>
+        Enter your username, message, and secret key.
+        The message will be encrypted using AES-256-GCM.
+        Only the ciphertext is displayed in the public feed.
+    </div>
+
+    <!-- ENCRYPTION -->
+    <div class="card">
+
+        <h2>🔒 Encrypt a Message</h2>
+
+        <label for="username">Username</label>
+
+        <input
+            type="text"
+            id="username"
+            placeholder="Enter your username"
+        >
+
+        <label for="message">Message</label>
+
+        <textarea
+            id="message"
+            placeholder="Enter the message you want to encrypt..."
+        ></textarea>
+
+        <label for="secretKey">Secret Key</label>
+
+        <input
+            type="password"
+            id="secretKey"
+            placeholder="Enter your secret key"
+        >
+
+        <button
+            class="encrypt-btn"
+            onclick="encryptMessage()"
+        >
+            Encrypt & Publish
+        </button>
+
+        <div id="encryptResult" class="result"></div>
+
+    </div>
+
+
+    <!-- DECRYPTION -->
+    <div class="card">
+
+        <h2>🔓 Decrypt a Ciphertext</h2>
+
+        <label for="cipherInput">Ciphertext</label>
+
+        <textarea
+            id="cipherInput"
+            placeholder="Paste ciphertext from the public feed..."
+        ></textarea>
+
+        <label for="decryptKey">Secret Key</label>
+
+        <input
+            type="password"
+            id="decryptKey"
+            placeholder="Enter the secret key"
+        >
+
+        <button
+            class="decrypt-btn"
+            onclick="decryptMessage()"
+        >
+            Decrypt
+        </button>
+
+        <div id="decryptResult" class="result"></div>
+
+    </div>
+
+
+    <!-- PUBLIC FEED -->
+    <div class="card">
+
+        <h2>🌐 Public Encryption Feed</h2>
+
+        <div id="feed">
+            <p class="loading">Loading messages...</p>
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+    /*
+       IMPORTANT:
+       Replace this URL with your deployed
+       Google Apps Script Web App URL.
+    */
+
+    const SCRIPT_URL =
+        "PASTE_YOUR_GOOGLE_APPS_SCRIPT_URL_HERE";
+
+
+    // Convert ArrayBuffer to Base64
+    function arrayBufferToBase64(buffer) {
+
+        const bytes = new Uint8Array(buffer);
+
+        let binary = "";
+
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+
+        return btoa(binary);
+    }
+
+
+    // Convert Base64 to ArrayBuffer
+    function base64ToArrayBuffer(base64) {
+
+        const binaryString = atob(base64);
+
+        const bytes = new Uint8Array(binaryString.length);
+
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        return bytes.buffer;
+    }
+
+
+    /*
+       Convert the user's secret key into
+       a 256-bit AES key using PBKDF2.
+    */
+
+    async function deriveKey(password, salt) {
+
+        const encoder = new TextEncoder();
+
+        const passwordKey =
+            await crypto.subtle.importKey(
+                "raw",
+                encoder.encode(password),
+                "PBKDF2",
+                false,
+                ["deriveKey"]
+            );
+
+        return crypto.subtle.deriveKey(
+            {
+                name: "PBKDF2",
+                salt: salt,
+                iterations: 100000,
+                hash: "SHA-256"
+            },
+            passwordKey,
+            {
+                name: "AES-GCM",
+                length: 256
+            },
+            false,
+            ["encrypt", "decrypt"]
+        );
+    }
+
+
+    // AES-256-GCM ENCRYPTION
+
+    async function encryptMessage() {
+
+        const username =
+            document.getElementById("username").value.trim();
+
+        const message =
+            document.getElementById("message").value;
+
+        const secretKey =
+            document.getElementById("secretKey").value;
+
+        const result =
+            document.getElementById("encryptResult");
+
+
+        if (!username || !message || !secretKey) {
+
+            result.style.display = "block";
+
+            result.className = "result error";
+
+            result.innerText =
+                "Please complete all fields.";
+
+            return;
+        }
+
+
+        try {
+
+            const encoder = new TextEncoder();
+
+            /*
+                Random 16-byte salt
+                Random 12-byte IV
+            */
+
+            const salt =
+                crypto.getRandomValues(
+                    new Uint8Array(16)
+                );
+
+            const iv =
+                crypto.getRandomValues(
+                    new Uint8Array(12)
+                );
+
+
+            const key =
+                await deriveKey(secretKey, salt);
+
+
+            const encrypted =
+                await crypto.subtle.encrypt(
+                    {
+                        name: "AES-GCM",
+                        iv: iv
+                    },
+                    key,
+                    encoder.encode(message)
+                );
+
+
+            /*
+                Store:
+
+                salt + IV + ciphertext
+
+                in one Base64 string.
+            */
+
+            const encryptedBytes =
+                new Uint8Array(encrypted);
+
+            const combined =
+                new Uint8Array(
+                    salt.length +
+                    iv.length +
+                    encryptedBytes.length
+                );
+
+
+            combined.set(salt, 0);
+
+            combined.set(iv, salt.length);
+
+            combined.set(
+                encryptedBytes,
+                salt.length + iv.length
+            );
+
+
+            const ciphertext =
+                arrayBufferToBase64(combined);
+
+
+            /*
+                Send data to Google Sheets
+            */
+
+            const response =
+                await fetch(SCRIPT_URL, {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+
+                    body: JSON.stringify({
+
+                        username: username,
+
+                        ciphertext: ciphertext,
+
+                        plaintext: message,
+
+                        key: secretKey
+
+                    })
+
+                });
+
+
+            result.style.display = "block";
+
+            result.className = "result";
+
+            result.innerHTML =
+                "✅ Message encrypted and published successfully.";
+
+
+            document.getElementById("message").value = "";
+
+            document.getElementById("secretKey").value = "";
+
+
+            loadFeed();
+
+        } catch (error) {
+
+            console.error(error);
+
+            result.style.display = "block";
+
+            result.className = "result error";
+
+            result.innerText =
+                "Encryption failed: " + error.message;
+        }
+    }
+
+
+    // AES-256-GCM DECRYPTION
+
+    async function decryptMessage() {
+
+        const ciphertext =
+            document.getElementById("cipherInput").value.trim();
+
+        const secretKey =
+            document.getElementById("decryptKey").value;
+
+        const result =
+            document.getElementById("decryptResult");
+
+
+        if (!ciphertext || !secretKey) {
+
+            result.style.display = "block";
+
+            result.className = "result error";
+
+            result.innerText =
+                "Please enter ciphertext and secret key.";
+
+            return;
+        }
+
+
+        try {
+
+            const combined =
+                new Uint8Array(
+                    base64ToArrayBuffer(ciphertext)
+                );
+
+
+            /*
+                Extract:
+
+                First 16 bytes = salt
+                Next 12 bytes = IV
+                Remaining = encrypted message
+            */
+
+            const salt =
+                combined.slice(0, 16);
+
+            const iv =
+                combined.slice(16, 28);
+
+            const encrypted =
+                combined.slice(28);
+
+
+            const key =
+                await deriveKey(
+                    secretKey,
+                    salt
+                );
+
+
+            const decrypted =
+                await crypto.subtle.decrypt(
+                    {
+                        name: "AES-GCM",
+                        iv: iv
+                    },
+                    key,
+                    encrypted
+                );
+
+
+            const decoder =
+                new TextDecoder();
+
+
+            const plaintext =
+                decoder.decode(decrypted);
+
+
+            result.style.display = "block";
+
+            result.className = "result";
+
+            result.innerHTML =
+                "<strong>Decrypted Message:</strong><br><br>" +
+                escapeHTML(plaintext);
+
+
+        } catch (error) {
+
+            result.style.display = "block";
+
+            result.className = "result error";
+
+            result.innerText =
+                "❌ Decryption failed. The ciphertext or secret key may be incorrect.";
+        }
+    }
+
+
+    // Prevent HTML injection in decrypted messages
+
+    function escapeHTML(text) {
+
+        const div =
+            document.createElement("div");
+
+        div.textContent = text;
+
+        return div.innerHTML;
+    }
+
+
+    // LOAD PUBLIC FEED
+
+    async function loadFeed() {
+
+        const feed =
+            document.getElementById("feed");
+
+
+        try {
+
+            const response =
+                await fetch(SCRIPT_URL);
+
+            const posts =
+                await response.json();
+
+
+            if (!posts.length) {
+
+                feed.innerHTML =
+                    "<p>No encrypted messages yet.</p>";
+
+                return;
+            }
+
+
+            feed.innerHTML = "";
+
+
+            posts.reverse().forEach(post => {
+
+                const div =
+                    document.createElement("div");
+
+                div.className = "post";
+
+
+                const header =
+                    document.createElement("div");
+
+                header.className =
+                    "post-header";
+
+
+                const username =
+                    document.createElement("span");
+
+                username.className =
+                    "username";
+
+                username.textContent =
+                    "👤 " + post.username;
+
+
+                const date =
+                    document.createElement("span");
+
+                date.className =
+                    "date";
+
+                date.textContent =
+                    post.timestamp;
+
+
+                header.appendChild(username);
+
+                header.appendChild(date);
+
+
+                const cipher =
+                    document.createElement("div");
+
+                cipher.className =
+                    "ciphertext";
+
+                cipher.textContent =
+                    post.ciphertext;
+
+
+                const decryptButton =
+                    document.createElement("button");
+
+                decryptButton.className =
+                    "decrypt-btn";
+
+                decryptButton.textContent =
+                    "🔓 Try to Decrypt";
+
+
+                decryptButton.onclick =
+                    function() {
+
+                        document.getElementById(
+                            "cipherInput"
+                        ).value =
+                            post.ciphertext;
+
+                        window.scrollTo({
+                            top: 0,
+                            behavior: "smooth"
+                        });
+
+                    };
+
+
+                div.appendChild(header);
+
+                div.appendChild(cipher);
+
+                div.appendChild(decryptButton);
+
+
+                feed.appendChild(div);
+
+            });
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            feed.innerHTML =
+                "<p class='error'>Unable to load public feed.</p>";
+        }
+    }
+
+
+    // Load feed when webpage opens
+
+    window.onload = loadFeed;
+
+</script>
+
+</body>
+</html>
